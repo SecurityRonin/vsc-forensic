@@ -1,0 +1,20 @@
+[package]
+name         = "vsc-forensic"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+description  = "Anomaly auditor over vsc-core — shadow-copy timeline/integrity findings via forensicnomicon::report"
+keywords     = ["forensics", "windows", "vss", "shadowcopy", "dfir"]
+categories   = ["parser-implementations"]
+readme       = "README.md"
+
+[dependencies]
+vsc = { workspace = true }
+forensicnomicon = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

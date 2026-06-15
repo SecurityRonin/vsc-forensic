@@ -1,0 +1,21 @@
+[package]
+name         = "vsc-core"
+version.workspace      = true
+edition.workspace      = true
+rust-version.workspace = true
+license.workspace      = true
+authors.workspace      = true
+repository.workspace   = true
+description  = "Reader for Windows Volume Shadow Copy (VSS) store/catalog structures"
+keywords     = ["forensics", "windows", "vss", "shadowcopy", "dfir"]
+categories   = ["parser-implementations", "filesystem"]
+exclude      = ["/fuzz", "/.github", "/docs"]
+
+[lib]
+name = "vsc"
+
+[dependencies]
+thiserror = { workspace = true }
+
+[lints]
+workspace = true
