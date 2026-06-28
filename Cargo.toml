@@ -20,7 +20,7 @@ repository   = "https://github.com/SecurityRonin/vsc-forensic"
 [workspace.dependencies]
 thiserror = "2"
 vsc = { version = "0.1", path = "core", package = "vsc-core" }
-forensicnomicon = { version = "0.5", features = ["std"] }
+forensicnomicon = { version = "1", features = ["std"] }
 
 # ---------------------------------------------------------------------------
 # Paranoid Gatekeeper: these crates parse untrusted, attacker-controllable
