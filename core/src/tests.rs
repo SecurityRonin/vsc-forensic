@@ -50,6 +50,7 @@ const ATTR: u32 =
 
 const CATALOG_OFF: u64 = 0x4000;
 const STORE_HDR_OFF: u64 = 0x8000;
+const STORE_BITMAP_OFF: u64 = 0xC000;
 const STORE_INFO_SIZE: u64 = 300;
 const IMG_LEN: usize = 0x10000;
 const OP_MACHINE: &str = "HOST-A";
@@ -97,6 +98,7 @@ fn build_image(with_type3: bool) -> Vec<u8> {
         wr(&mut b, e1, &3u64.to_le_bytes());
         wr(&mut b, e1 + 16, &STORE_ID);
         wr(&mut b, e1 + 32, &STORE_HDR_OFF.to_le_bytes());
+        wr(&mut b, e1 + 48, &STORE_BITMAP_OFF.to_le_bytes());
 
         // Store block header @ STORE_HDR_OFF.
         let s = STORE_HDR_OFF as usize;
@@ -192,9 +194,11 @@ fn parse_catalog_entry_store_pointer() {
         CatalogEntry::StorePointer {
             store_id,
             store_header_offset,
+            store_bitmap_offset,
         } => {
             assert_eq!(store_id, STORE_ID);
             assert_eq!(store_header_offset, STORE_HDR_OFF);
+            assert_eq!(store_bitmap_offset, STORE_BITMAP_OFF);
         }
         other => panic!("expected StorePointer, got {other:?}"),
     }
@@ -241,6 +245,7 @@ fn open_enumerates_single_store() {
     assert_eq!(d.flags, FLAGS);
     assert_eq!(d.creation_time, CTIME);
     assert_eq!(d.store_header_offset, Some(STORE_HDR_OFF));
+    assert_eq!(d.store_bitmap_offset, Some(STORE_BITMAP_OFF));
 }
 
 #[test]
