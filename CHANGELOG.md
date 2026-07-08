@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crates adhere
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — 2026-07-08
+
+### Changed
+
+- Documentation only: corrected the README, docs site, and crate metadata to
+  reflect the shipped state (the 0.1.0 pages still described a "planned scaffold").
+  `vsc-core` now carries a README on its crates.io page. No code changes.
+
 ## [0.1.0] — 2026-07-08
 
 First release. `vsc-core` and `vsc-forensic` published to crates.io.

@@ -9,6 +9,7 @@ repository.workspace   = true
 description  = "Reader for Windows Volume Shadow Copy (VSS) store/catalog structures"
 keywords     = ["forensics", "windows", "vss", "shadowcopy", "dfir"]
 categories   = ["parser-implementations", "filesystem"]
+readme       = "../README.md"
 exclude      = ["/fuzz", "/.github", "/docs"]
 
 [lib]
