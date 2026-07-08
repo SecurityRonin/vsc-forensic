@@ -20,6 +20,8 @@ repository   = "https://github.com/SecurityRonin/vsc-forensic"
 [workspace.dependencies]
 thiserror = "2"
 uuid = "1"
+# REUSE, don't reinvent calendar math: jiff renders FILETIME as RFC 3339.
+jiff = "0.2"
 vsc = { version = "0.1", path = "core", package = "vsc-core" }
 forensicnomicon = { version = "1", features = ["std"] }
 
