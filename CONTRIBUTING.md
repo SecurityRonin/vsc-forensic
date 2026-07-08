@@ -6,10 +6,9 @@ compromised systems, so correctness and robustness are not negotiable. The bar
 is high and the workflow is strict — please read this before opening a pull
 request.
 
-The repository is currently an early-stage scaffold: the VSS parser is under
-construction (see [`docs/RESEARCH.md`](docs/RESEARCH.md) for the format
-research that guides the design). The disciplines below apply from the first
-line of parser code.
+The VSS reader and analyzer ship on crates.io; see
+[`docs/RESEARCH.md`](docs/RESEARCH.md) for the on-disk format research behind the
+design. The disciplines below apply to every change.
 
 ## Test-Driven Development is mandatory
 

@@ -6,8 +6,7 @@ systems. Hostile input is the expected case, not an edge case. Robustness
 against crafted catalog and store records is a core design goal, and we take
 reports of crashes, hangs, or memory-safety issues seriously.
 
-The crates are an early-stage scaffold; the security posture below is the
-standard the parser is being built to meet.
+The security posture below is the standard the crates are built and held to.
 
 ## Supported versions
 
