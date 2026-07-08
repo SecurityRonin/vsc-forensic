@@ -23,6 +23,8 @@ uuid = { workspace = true }
 # Tier-1 oracle: open a real E01 disk image to validate against pyvshadow
 # ground truth (see tests/oracle_pcmus001.rs, env-gated on VSC_ORACLE_IMAGE).
 ewf = "0.4"
+# Tier-1 reconstruction oracle hashes each reconstructed block (RustCrypto).
+sha2 = "0.10"
 
 [lints]
 workspace = true
