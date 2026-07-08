@@ -85,6 +85,10 @@ pub struct StoreDescriptor {
     /// Volume-relative offset of the store block header (from the type-0x03
     /// entry), or `None` when the catalog has no type-0x03 entry (Win 2003 R2).
     pub store_header_offset: Option<u64>,
+    /// Volume-relative offset of the store bitmap chain (0x0006), from the
+    /// type-0x03 entry at offset 48, or `None` when there is no type-0x03 entry.
+    /// Phase-2 reconstruction walks this chain to tell unallocated blocks apart.
+    pub store_bitmap_offset: Option<u64>,
 }
 
 impl StoreDescriptor {
@@ -102,10 +106,11 @@ pub(crate) enum CatalogEntry {
     Empty,
     /// Type 0x02 — a snapshot descriptor.
     Snapshot(StoreDescriptor),
-    /// Type 0x03 — a pointer to a store's block header.
+    /// Type 0x03 — a pointer to a store's block header and bitmap chains.
     StorePointer {
         store_id: [u8; 16],
         store_header_offset: u64,
+        store_bitmap_offset: u64,
     },
     /// Any other entry type (0x01, unknown).
     Other,
@@ -121,10 +126,12 @@ pub(crate) fn parse_catalog_entry(buf: &[u8]) -> CatalogEntry {
             flags: le_u64(buf, 40),
             creation_time: le_u64(buf, 48),
             store_header_offset: None,
+            store_bitmap_offset: None,
         }),
         0x03 => CatalogEntry::StorePointer {
             store_id: read_guid(buf, 16),
             store_header_offset: le_u64(buf, 32),
+            store_bitmap_offset: le_u64(buf, 48),
         },
         0x00 => CatalogEntry::Empty,
         _ => CatalogEntry::Other,

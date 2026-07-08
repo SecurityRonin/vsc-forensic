@@ -215,6 +215,7 @@ fn walk_catalog<R: Read + Seek>(
                 CatalogEntry::StorePointer {
                     store_id,
                     store_header_offset,
+                    store_bitmap_offset,
                 } => {
                     if let Some(descriptor) = stores
                         .iter_mut()
@@ -222,6 +223,7 @@ fn walk_catalog<R: Read + Seek>(
                         .find(|d| d.store_id == store_id && d.store_header_offset.is_none())
                     {
                         descriptor.store_header_offset = Some(store_header_offset);
+                        descriptor.store_bitmap_offset = Some(store_bitmap_offset);
                     }
                 }
                 CatalogEntry::Empty | CatalogEntry::Other => {}
