@@ -9,7 +9,7 @@ repository.workspace   = true
 description  = "Anomaly auditor over vsc-core — shadow-copy timeline/integrity findings via forensicnomicon::report"
 keywords     = ["forensics", "windows", "vss", "shadowcopy", "dfir"]
 categories   = ["parser-implementations"]
-readme       = "README.md"
+readme       = "../README.md"
 
 [dependencies]
 vsc = { workspace = true }
