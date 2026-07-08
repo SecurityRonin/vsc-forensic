@@ -18,5 +18,10 @@ name = "vsc"
 thiserror = { workspace = true }
 uuid = { workspace = true }
 
+[dev-dependencies]
+# Tier-1 oracle: open a real E01 disk image to validate against pyvshadow
+# ground truth (see tests/oracle_pcmus001.rs, env-gated on VSC_ORACLE_IMAGE).
+ewf = "0.4"
+
 [lints]
 workspace = true
