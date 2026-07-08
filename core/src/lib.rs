@@ -13,9 +13,10 @@
 //! gigabytes — and every multi-byte read is bounds-checked, so malformed input
 //! yields safe defaults or a typed [`VssError`], never a panic.
 //!
-//! Phase 1 (this crate) enumerates stores and decodes store information plus the
-//! typed diff-area records ([`BlockDescriptor`], [`StoreBlockRange`]). The
-//! copy-on-write block-reconstruction engine is Phase 2 and out of scope here.
+//! It enumerates stores and decodes store information plus the typed diff-area
+//! records ([`BlockDescriptor`], [`StoreBlockRange`]), and reconstructs a
+//! snapshot's copy-on-write view of the volume via [`VssVolume::snapshot`] →
+//! [`Snapshot::read_block`] / [`Snapshot::read_at`].
 
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
@@ -28,6 +29,7 @@ mod bytes;
 pub mod catalog;
 pub mod error;
 pub mod guid;
+pub mod reconstruct;
 pub mod store;
 
 #[cfg(test)]
@@ -37,6 +39,7 @@ pub use block::{BlockDescriptor, BlockDescriptorFlags, StoreBlockRange};
 pub use catalog::{StoreDescriptor, VolumeHeader};
 pub use error::VssError;
 pub use guid::{format_guid, VSS_IDENTIFIER};
+pub use reconstruct::Snapshot;
 pub use store::{AttributeFlags, StoreBlockHeader, StoreInfo};
 
 use catalog::{

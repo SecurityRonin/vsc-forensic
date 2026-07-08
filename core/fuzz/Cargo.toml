@@ -33,3 +33,10 @@ path = "fuzz_targets/fuzz_store.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "fuzz_reconstruct"
+path = "fuzz_targets/fuzz_reconstruct.rs"
+test = false
+doc = false
+bench = false

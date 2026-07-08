@@ -741,7 +741,8 @@ fn snapshot_index_out_of_range() {
             assert_eq!(index, 5);
             assert_eq!(count, 1);
         }
-        other => panic!("expected StoreIndexOutOfRange, got {other:?}"),
+        Err(e) => panic!("expected StoreIndexOutOfRange, got {e:?}"),
+        Ok(_) => panic!("expected StoreIndexOutOfRange, got Ok"),
     }
 }
 
@@ -751,7 +752,8 @@ fn snapshot_unavailable_without_type3() {
     let mut vol = VssVolume::open(Cursor::new(build_image(false))).unwrap();
     match vol.snapshot(0) {
         Err(VssError::StoreInfoUnavailable { index }) => assert_eq!(index, 0),
-        other => panic!("expected StoreInfoUnavailable, got {other:?}"),
+        Err(e) => panic!("expected StoreInfoUnavailable, got {e:?}"),
+        Ok(_) => panic!("expected StoreInfoUnavailable, got Ok"),
     }
 }
 
