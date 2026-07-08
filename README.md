@@ -36,6 +36,12 @@ for store in vol.stores() {
 if vol.store_count() > 0 {
     let info = vol.store_info(0)?;
     println!("shadow copy {}", info.shadow_copy_id_string());
+
+    // Reconstruct the volume as it was at the snapshot — copy-on-write blocks
+    // overlaid on the live volume — and read any 16 KiB block back.
+    let mut snap = vol.snapshot(0)?;
+    let block = snap.read_block(0)?; // the NTFS boot sector as it was at snapshot time
+    println!("snapshot boot sector: {:02x?}", &block[3..11]); // b"NTFS    "
 }
 # Ok::<(), vsc::error::VssError>(())
 ```
@@ -80,14 +86,14 @@ Findings are observations, not verdicts — the "consistent with" framing is del
 | VSS volume header + catalog enumeration (store GUID, size, sequence, creation time) | ✅ |
 | Store metadata decode (shadow-copy IDs, attribute flags, originating machine) | ✅ |
 | `vsc-forensic` anomaly auditor (`VSC-*` findings → `forensicnomicon::report`) | ✅ |
-| Fuzzed (`fuzz_catalog` / `fuzz_store`) + Tier-1 validated against `libvshadow` | ✅ |
-| COW block-list reconstruction — materialize a snapshot's view of the volume | planned (Phase 2) |
+| Fuzzed (`fuzz_catalog` / `fuzz_store` / `fuzz_reconstruct`) + Tier-1 validated against `libvshadow` | ✅ |
+| COW block-list reconstruction — materialize a snapshot's view of the volume, read any block back | ✅ |
 
 ## Trust but verify
 
 Both crates enforce the fleet hardening contract: `#![forbid(unsafe_code)]`, the Paranoid-Gatekeeper clippy set (`unwrap_used`/`expect_used` denied), bounds-checked readers that never panic on malformed input, `cargo-deny` supply-chain gating, and a 100%-line-coverage CI gate. Every parsed structure has a `cargo-fuzz` target whose invariant is "must not panic".
 
-Correctness is proven against an **independent third-party oracle** — [`libvshadow`](https://github.com/libyal/libvshadow) (via `pyvshadow`) — run on a real public CTF disk image: `vsc-core`'s catalog and store-metadata output matches the oracle field-for-field (store count, GUID, volume size, creation FILETIME, shadow-copy IDs). See [`tests/data/README.md`](tests/data/README.md) and the env-gated `oracle_pcmus001` integration test.
+Correctness is proven against an **independent third-party oracle** — [`libvshadow`](https://github.com/libyal/libvshadow) (via `pyvshadow`) — run on a real public CTF disk image: `vsc-core`'s catalog and store-metadata output matches the oracle field-for-field (store count, GUID, volume size, creation FILETIME, shadow-copy IDs), and its **reconstruction** reproduces the snapshot's bytes block-for-block across every path — passthrough, bitmap zero-fill, plain copy-on-write, and 512-byte overlay merge (validated over 1,415 blocks; the algorithm is documented in [docs/RECONSTRUCTION.md](docs/RECONSTRUCTION.md)). See [`tests/data/README.md`](tests/data/README.md) and the env-gated `oracle_pcmus001` / `reconstruct_pcmus001` integration tests.
 
 ## Documentation
 

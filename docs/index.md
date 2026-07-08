@@ -5,9 +5,10 @@ disk-history member of the forensic fleet.
 
 !!! success "Status"
     Shipping. `vsc-core` and `vsc-forensic` are published on crates.io.
-    VSS catalog + store-metadata enumeration and the anomaly auditor are complete
-    and Tier-1 validated against `libvshadow`. COW block-list reconstruction is the
-    Phase-2 follow-on. Format research: [Format Research](RESEARCH.md).
+    VSS catalog + store-metadata enumeration, the anomaly auditor, and copy-on-write
+    snapshot reconstruction are complete and Tier-1 validated against `libvshadow`.
+    Format research: [Format Research](RESEARCH.md); reconstruction algorithm:
+    [Reconstruction](RECONSTRUCTION.md).
 
 ## What it does
 
@@ -21,13 +22,12 @@ encode a temporal cohort of the filesystem's past states.
 - locates the VSS volume header and walks the **catalog** of shadow-copy stores,
 - enumerates each store's descriptor (GUID, size, sequence, creation time) and
   per-snapshot **metadata** (shadow-copy IDs, attribute flags, originating machine),
-- and grades shadow-copy timeline and integrity **anomalies** as
+- grades shadow-copy timeline and integrity **anomalies** as
   `forensicnomicon::report` findings that aggregate with every other artifact
-  layer.
-
-COW block-list reconstruction — materializing each snapshot as a point-in-time
-view of the volume for cross-snapshot state diffing — is the planned Phase-2
-capability.
+  layer, and
+- **reconstructs** each snapshot as a point-in-time view of the volume — copy-on-write
+  blocks overlaid on the live volume — so any block can be read back as it was at
+  snapshot time.
 
 ## The two-crate split
 
@@ -51,7 +51,7 @@ records. That separation is why `vsc-core` is useful on its own and why
 | `vsc-core` — VSS volume header + catalog enumeration | ✅ |
 | `vsc-core` — store metadata decode (shadow-copy IDs, attribute flags, machine) | ✅ |
 | `vsc-forensic` — anomaly auditor (`VSC-*` findings) | ✅ |
+| `vsc-core` — COW snapshot reconstruction (`snapshot().read_block/read_at`) | ✅ |
 | Fuzz targets + Tier-1 real-VSS-image validation (vs `libvshadow`) | ✅ |
-| COW block-list reconstruction, cross-snapshot state diff | planned (Phase 2) |
 
 [Privacy Policy](https://securityronin.github.io/vsc-forensic/privacy/) · [Terms of Service](https://securityronin.github.io/vsc-forensic/terms/) · © 2026 Security Ronin Ltd

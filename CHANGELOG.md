@@ -4,6 +4,29 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the crates adhere
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-07-08
+
+### Added
+
+- **`vsc-core` — copy-on-write snapshot reconstruction (Phase 2).**
+  `VssVolume::snapshot(index)` builds the store's diff-area block map (the 0x0003
+  descriptor chain at `store_header_offset + 16384`) and store bitmap (the 0x0006
+  chain), returning a `Snapshot` that materializes the volume as it was at snapshot
+  time. `Snapshot::read_block(offset)` / `read_at(offset, buf)` reconstruct any
+  block: plain copy-on-write blocks and 512-byte overlay merges are read from the
+  store, bitmap-unallocated blocks return zeros, and unchanged blocks pass through
+  to the live volume.
+- Validated **byte-for-byte against `libvshadow`** over 1,415 blocks of a real
+  public CTF image across all four paths (passthrough / zero-fill / plain-COW /
+  overlay); env-gated `reconstruct_pcmus001` Tier-1 test + `fuzz_reconstruct`
+  target. Algorithm documented in `docs/RECONSTRUCTION.md`.
+
+### Changed
+
+- `StoreDescriptor` gains `store_bitmap_offset: Option<u64>` (the 0x0006 bitmap
+  chain offset from the catalog type-0x03 entry), needed for reconstruction. This
+  adds a public field to a non-`#[non_exhaustive]` struct, hence the minor bump.
+
 ## [0.1.1] — 2026-07-08
 
 ### Changed

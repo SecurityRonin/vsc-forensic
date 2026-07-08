@@ -7,7 +7,7 @@ members = ["core", "forensic"]
 # members inherit via `field.workspace = true`.
 # ---------------------------------------------------------------------------
 [workspace.package]
-version      = "0.1.1"
+version      = "0.2.0"
 edition      = "2021"
 rust-version = "1.81"
 license      = "Apache-2.0"
@@ -22,7 +22,7 @@ thiserror = "2"
 uuid = "1"
 # REUSE, don't reinvent calendar math: jiff renders FILETIME as RFC 3339.
 jiff = "0.2"
-vsc = { version = "0.1", path = "core", package = "vsc-core" }
+vsc = { version = "0.2", path = "core", package = "vsc-core" }
 forensicnomicon = { version = "1", features = ["std"] }
 
 # ---------------------------------------------------------------------------
