@@ -45,6 +45,16 @@ Enumerated with the same oracle harness (Doer-Checker — do not re-guess these)
 - `defcon-dfir-ctf-2018/MaxPowersCDrive.E01` — single 50 GiB NTFS, `0x1E00`
   all-zero → **0 stores**.
 
+## Phase-2 reconstruction oracle
+
+`../oracle/reconstruction_oracle.json` holds the pyvshadow-derived sha256 of the
+16384-byte block that libvshadow reconstructs for store 0 of PC-MUS-001.E01 at
+representative volume offsets — passthrough (`0`, `16384`), zero-fill (`163840`),
+plain-COW (`3997696`), and overlay (`4227072`). `vsc-core`'s `SnapshotReader` must
+reproduce each block byte-for-byte. The full copy-on-write algorithm (validated
+byte-for-byte over 1,415 blocks against pyvshadow) is documented in
+[`docs/RECONSTRUCTION.md`](../../docs/RECONSTRUCTION.md).
+
 ## Synthetic unit fixtures
 
 Fast TDD fixtures for parser mechanics (VSS volume header @0x1E00, catalog block,

@@ -1,0 +1,17 @@
+{
+  "note": "Tier-1 reconstruction oracle for vsc-core Phase 2. Each entry is the sha256 of the 16384-byte block that libvshadow (pyvshadow) reconstructs for store 0 of the Magnet PC-MUS-001.E01 NTFS volume (byte offset 122683392) at the given volume offset. vsc-core's SnapshotReader must reproduce each block byte-for-byte (hence sha256 match). Captured 2026-07-08 with pyvshadow 20240504.",
+  "image": "issen/tests/data/magnet-summit-2023-ctf/PC-MUS-001.E01",
+  "ntfs_volume_offset": 122683392,
+  "store_index": 0,
+  "block_size": 16384,
+  "store_header_offset": 42358734848,
+  "block_descriptor_list_offset": 42358751232,
+  "store_bitmap_offset": 42358833152,
+  "cases": [
+    { "offset": 0,       "kind": "passthrough", "sha256": "abde4a4a90d2dd86ee17e4835456483e06aaa5381bae8b131b943d4f85cab6c6" },
+    { "offset": 16384,   "kind": "passthrough", "sha256": "3dc9ae56c5ea2eac8d9f4e47b9e31a873a29cb3c6e3b90ecf5adc4096d1250d4" },
+    { "offset": 163840,  "kind": "zero-fill",   "sha256": "4fe7b59af6de3b665b67788cc2f99892ab827efae3a467342b3bb4e3bc8e5bfe" },
+    { "offset": 3997696, "kind": "cow-plain",   "sha256": "da262d8fcf31c4db265671ba6851032c3cc1980bb79679f31e9dc94037201f65" },
+    { "offset": 4227072, "kind": "overlay",     "sha256": "a1718f9d1db924d3adfb7c9f05f1cc498ef51b86dda1e719bd3ff7f98fc20d8e" }
+  ]
+}
