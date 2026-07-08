@@ -52,9 +52,16 @@ fn utf16le(s: &str) -> Vec<u8> {
     s.encode_utf16().flat_map(u16::to_le_bytes).collect()
 }
 
-/// Build a VSS volume image. `header` writes the volume header at 0x1E00;
-/// `catalog` names and populates the catalog with one entry pair per spec.
+/// Build a VSS volume image with each store's type-0x03 pointer present.
 fn build(specs: &[StoreSpec], header: bool, catalog: bool) -> Vec<u8> {
+    build_full(specs, header, catalog, true)
+}
+
+/// Build a VSS volume image. `header` writes the volume header at 0x1E00;
+/// `catalog` names and populates the catalog. When `with_type3` is false the
+/// type-0x03 store pointer (and store block/info) are omitted, so the store is
+/// enumerated but its store information is unreadable.
+fn build_full(specs: &[StoreSpec], header: bool, catalog: bool, with_type3: bool) -> Vec<u8> {
     let n = specs.len().max(1) as u64;
     let img_len = (STORE_BASE + STORE_STRIDE * n + 0x1000) as usize;
     let mut b = vec![0u8; img_len];
@@ -85,6 +92,10 @@ fn build(specs: &[StoreSpec], header: bool, catalog: bool) -> Vec<u8> {
             wr(&mut b, e02 + 32, &s.sequence.to_le_bytes());
             wr(&mut b, e02 + 40, &0x40u64.to_le_bytes());
             wr(&mut b, e02 + 48, &s.creation_time.to_le_bytes());
+
+            if !with_type3 {
+                continue;
+            }
 
             let e03 = e02 + 128;
             wr(&mut b, e03, &3u64.to_le_bytes());
@@ -317,6 +328,26 @@ fn store_present_finding_has_subject_and_evidence() {
         .iter()
         .any(|s| s.scheme == "vss" && s.kind == "shadow_copy"));
     assert!(finding.evidence.iter().any(|e| e.field == "sequence"));
+}
+
+#[test]
+fn audit_skips_attribute_check_when_store_info_unreadable() {
+    // A store with no type-0x03 pointer is enumerated, but its store info cannot
+    // be read — the attribute check is skipped, not treated as an error.
+    let mut vol = open(build_full(
+        &[spec(1, 1, AttributeFlags::CLIENT_ACCESSIBLE)],
+        true,
+        true,
+        false,
+    ));
+    assert_eq!(vol.store_count(), 1);
+    let anomalies = audit(&mut vol);
+    assert!(anomalies
+        .iter()
+        .any(|a| matches!(a.kind, AnomalyKind::StorePresent { .. })));
+    assert!(!anomalies
+        .iter()
+        .any(|a| matches!(a.kind, AnomalyKind::StoreNonPersistent { .. })));
 }
 
 #[test]
