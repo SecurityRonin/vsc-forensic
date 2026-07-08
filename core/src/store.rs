@@ -5,6 +5,9 @@
 //! shadow-copy identity GUIDs, the snapshot context, attribute flags, and the
 //! operating/service machine strings.
 
+use crate::bytes::{le_u16, le_u32, le_u64, read_guid, utf16le_string};
+use crate::guid::{format_guid, VSS_IDENTIFIER};
+
 /// Length of a store block header, in bytes.
 pub const STORE_BLOCK_HEADER_LEN: usize = 128;
 
@@ -38,8 +41,15 @@ impl StoreBlockHeader {
     /// Parse a 128-byte store block header.
     #[must_use]
     pub fn parse(buf: &[u8]) -> Self {
-        let _ = buf;
-        unimplemented!("RED: StoreBlockHeader::parse")
+        StoreBlockHeader {
+            has_vss_identifier: read_guid(buf, 0) == VSS_IDENTIFIER,
+            version: le_u32(buf, 16),
+            record_type: le_u32(buf, 20),
+            relative_offset: le_u64(buf, 24),
+            current_offset: le_u64(buf, 32),
+            next_offset: le_u64(buf, 40),
+            store_information_size: le_u64(buf, 48),
+        }
     }
 }
 
@@ -72,32 +82,31 @@ impl AttributeFlags {
     /// The raw flag bits.
     #[must_use]
     pub fn bits(self) -> u32 {
-        unimplemented!("RED: AttributeFlags::bits")
+        self.0
     }
 
     /// Whether any of the given flag bits are set.
     #[must_use]
     pub fn contains(self, flag: u32) -> bool {
-        let _ = flag;
-        unimplemented!("RED: AttributeFlags::contains")
+        self.0 & flag != 0
     }
 
     /// Whether the persistent flag is set (survives reboot).
     #[must_use]
     pub fn is_persistent(self) -> bool {
-        unimplemented!("RED: AttributeFlags::is_persistent")
+        self.contains(Self::PERSISTENT)
     }
 
     /// Whether the client-accessible flag is set.
     #[must_use]
     pub fn is_client_accessible(self) -> bool {
-        unimplemented!("RED: AttributeFlags::is_client_accessible")
+        self.contains(Self::CLIENT_ACCESSIBLE)
     }
 
     /// Whether the differential (copy-on-write) flag is set.
     #[must_use]
     pub fn is_differential(self) -> bool {
-        unimplemented!("RED: AttributeFlags::is_differential")
+        self.contains(Self::DIFFERENTIAL)
     }
 }
 
@@ -122,20 +131,43 @@ impl StoreInfo {
     /// The shadow-copy identifier rendered as a canonical GUID string.
     #[must_use]
     pub fn shadow_copy_id_string(&self) -> String {
-        unimplemented!("RED: StoreInfo::shadow_copy_id_string")
+        format_guid(&self.shadow_copy_id)
     }
 
     /// The shadow-copy set identifier rendered as a canonical GUID string.
     #[must_use]
     pub fn shadow_copy_set_id_string(&self) -> String {
-        unimplemented!("RED: StoreInfo::shadow_copy_set_id_string")
+        format_guid(&self.shadow_copy_set_id)
     }
 
     /// Parse store information from the bytes directly following the store
     /// block header.
+    ///
+    /// The two machine strings are length-prefixed UTF-16LE runs; every offset
+    /// and length is bounds-checked, so a truncated or lying length yields an
+    /// empty string rather than a panic or out-of-bounds read.
     #[must_use]
     pub fn parse(buf: &[u8]) -> Self {
-        let _ = buf;
-        unimplemented!("RED: StoreInfo::parse")
+        let op_size = le_u16(buf, 64) as usize;
+        let operating_machine = read_string(buf, 66, op_size);
+        let svc_size_off = 66 + op_size;
+        let svc_size = le_u16(buf, svc_size_off) as usize;
+        let service_machine = read_string(buf, svc_size_off + 2, svc_size);
+        StoreInfo {
+            shadow_copy_id: read_guid(buf, 16),
+            shadow_copy_set_id: read_guid(buf, 32),
+            snapshot_context: le_u32(buf, 48),
+            attributes: AttributeFlags(le_u32(buf, 56)),
+            operating_machine,
+            service_machine,
+        }
     }
+}
+
+/// Read a UTF-16LE string of `len` bytes at `off`, yielding an empty string when
+/// the range is out of bounds.
+fn read_string(buf: &[u8], off: usize, len: usize) -> String {
+    buf.get(off..off + len)
+        .map(utf16le_string)
+        .unwrap_or_default()
 }

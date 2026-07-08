@@ -23,6 +23,5 @@ pub const VSS_IDENTIFIER: [u8; 16] = [
 /// the rendering libvshadow/`pyvshadow` produce for store identifiers.
 #[must_use]
 pub fn format_guid(raw: &[u8; 16]) -> String {
-    let _ = raw;
-    unimplemented!("RED: format_guid")
+    uuid::Uuid::from_bytes_le(*raw).to_string()
 }

@@ -229,7 +229,7 @@ fn catalog_helpers() {
 
 #[test]
 fn open_enumerates_single_store() {
-    let mut vol = VssVolume::open(Cursor::new(build_image(true))).unwrap();
+    let vol = VssVolume::open(Cursor::new(build_image(true))).unwrap();
     assert!(vol.has_vss_header());
     assert_eq!(vol.store_count(), 1);
     assert_eq!(vol.catalog_offset(), CATALOG_OFF);
@@ -245,7 +245,7 @@ fn open_enumerates_single_store() {
 
 #[test]
 fn open_no_vss_header() {
-    let mut vol = VssVolume::open(Cursor::new(vec![0u8; IMG_LEN])).unwrap();
+    let vol = VssVolume::open(Cursor::new(vec![0u8; IMG_LEN])).unwrap();
     assert!(!vol.has_vss_header());
     assert_eq!(vol.store_count(), 0);
     assert!(vol.stores().is_empty());
@@ -254,7 +254,7 @@ fn open_no_vss_header() {
 #[test]
 fn open_tiny_reader_no_header() {
     // A reader smaller than the header offset opens cleanly with no VSS.
-    let mut vol = VssVolume::open(Cursor::new(vec![0u8; 100])).unwrap();
+    let vol = VssVolume::open(Cursor::new(vec![0u8; 100])).unwrap();
     assert!(!vol.has_vss_header());
     assert_eq!(vol.store_count(), 0);
 }
@@ -344,12 +344,16 @@ fn store_info_unavailable_without_type3() {
 fn store_info_offset_out_of_bounds() {
     let mut b = build_image(true);
     let e1 = CATALOG_OFF as usize + 256;
-    wr(&mut b, e1 + 32, &(IMG_LEN as u64 + 0x100000).to_le_bytes());
+    wr(
+        &mut b,
+        e1 + 32,
+        &(IMG_LEN as u64 + 0x0010_0000).to_le_bytes(),
+    );
     let mut vol = VssVolume::open(Cursor::new(b)).unwrap();
     match vol.store_info(0) {
         Err(VssError::StoreOffsetOutOfBounds { index, offset, .. }) => {
             assert_eq!(index, 0);
-            assert_eq!(offset, IMG_LEN as u64 + 0x100000);
+            assert_eq!(offset, IMG_LEN as u64 + 0x0010_0000);
         }
         other => panic!("expected StoreOffsetOutOfBounds, got {other:?}"),
     }

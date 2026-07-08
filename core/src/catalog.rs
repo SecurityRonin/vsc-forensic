@@ -5,6 +5,9 @@
 //! entry is a snapshot descriptor; the paired type-0x03 entry points at the
 //! store's block header so its store-information can be read.
 
+use crate::bytes::{le_u32, le_u64, read_guid};
+use crate::guid::{format_guid, VSS_IDENTIFIER};
+
 /// Byte offset of the VSS volume header within the NTFS volume.
 pub const VSS_VOLUME_HEADER_OFFSET: u64 = 0x1E00;
 
@@ -52,8 +55,16 @@ impl VolumeHeader {
     /// Parse a volume header from a byte slice positioned at offset 0x1E00.
     #[must_use]
     pub fn parse(buf: &[u8]) -> Self {
-        let _ = buf;
-        unimplemented!("RED: VolumeHeader::parse")
+        VolumeHeader {
+            has_vss_identifier: read_guid(buf, 0) == VSS_IDENTIFIER,
+            version: le_u32(buf, 16),
+            record_type: le_u32(buf, 20),
+            current_offset: le_u64(buf, 24),
+            catalog_offset: le_u64(buf, 48),
+            maximum_size: le_u64(buf, 56),
+            volume_identifier: read_guid(buf, 64),
+            storage_volume_identifier: read_guid(buf, 80),
+        }
     }
 }
 
@@ -80,7 +91,7 @@ impl StoreDescriptor {
     /// The store identifier rendered as a canonical GUID string.
     #[must_use]
     pub fn store_id_string(&self) -> String {
-        unimplemented!("RED: StoreDescriptor::store_id_string")
+        format_guid(&self.store_id)
     }
 }
 
@@ -102,19 +113,31 @@ pub(crate) enum CatalogEntry {
 
 /// Parse a single 128-byte catalog entry.
 pub(crate) fn parse_catalog_entry(buf: &[u8]) -> CatalogEntry {
-    let _ = buf;
-    unimplemented!("RED: parse_catalog_entry")
+    match le_u64(buf, 0) {
+        0x02 => CatalogEntry::Snapshot(StoreDescriptor {
+            store_id: read_guid(buf, 16),
+            volume_size: le_u64(buf, 8),
+            sequence: le_u64(buf, 32),
+            flags: le_u64(buf, 40),
+            creation_time: le_u64(buf, 48),
+            store_header_offset: None,
+        }),
+        0x03 => CatalogEntry::StorePointer {
+            store_id: read_guid(buf, 16),
+            store_header_offset: le_u64(buf, 32),
+        },
+        0x00 => CatalogEntry::Empty,
+        _ => CatalogEntry::Other,
+    }
 }
 
 /// Read the next-block offset (volume-relative) from a catalog block header.
 pub(crate) fn catalog_next_block_offset(block: &[u8]) -> u64 {
-    let _ = block;
-    unimplemented!("RED: catalog_next_block_offset")
+    le_u64(block, 40)
 }
 
 /// Whether a catalog block header carries the VSS identifier and catalog record
 /// type — used to stop walking on a corrupt/foreign block.
 pub(crate) fn is_catalog_block(block: &[u8]) -> bool {
-    let _ = block;
-    unimplemented!("RED: is_catalog_block")
+    read_guid(block, 0) == VSS_IDENTIFIER && le_u32(block, 20) == CATALOG_BLOCK_RECORD_TYPE
 }

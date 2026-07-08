@@ -5,6 +5,8 @@
 //! blocks to materialize a snapshot's view of the volume) is Phase 2 and is
 //! deliberately **not** implemented here.
 
+use crate::bytes::{le_u32, le_u64};
+
 /// Length of a block descriptor record, in bytes.
 pub const BLOCK_DESCRIPTOR_LEN: usize = 32;
 
@@ -26,32 +28,31 @@ impl BlockDescriptorFlags {
     /// The raw flag bits.
     #[must_use]
     pub fn bits(self) -> u32 {
-        unimplemented!("RED: BlockDescriptorFlags::bits")
+        self.0
     }
 
     /// Whether any of the given flag bits are set.
     #[must_use]
     pub fn contains(self, flag: u32) -> bool {
-        let _ = flag;
-        unimplemented!("RED: BlockDescriptorFlags::contains")
+        self.0 & flag != 0
     }
 
     /// Whether the forwarder flag is set.
     #[must_use]
     pub fn is_forwarder(self) -> bool {
-        unimplemented!("RED: BlockDescriptorFlags::is_forwarder")
+        self.contains(Self::FORWARDER)
     }
 
     /// Whether the overlay flag is set.
     #[must_use]
     pub fn is_overlay(self) -> bool {
-        unimplemented!("RED: BlockDescriptorFlags::is_overlay")
+        self.contains(Self::OVERLAY)
     }
 
     /// Whether the not-used flag is set.
     #[must_use]
     pub fn is_not_used(self) -> bool {
-        unimplemented!("RED: BlockDescriptorFlags::is_not_used")
+        self.contains(Self::NOT_USED)
     }
 }
 
@@ -75,8 +76,13 @@ impl BlockDescriptor {
     /// Parse a 32-byte block descriptor.
     #[must_use]
     pub fn parse(buf: &[u8]) -> Self {
-        let _ = buf;
-        unimplemented!("RED: BlockDescriptor::parse")
+        BlockDescriptor {
+            original_offset: le_u64(buf, 0),
+            relative_store_offset: le_u64(buf, 8),
+            store_offset: le_u64(buf, 16),
+            flags: BlockDescriptorFlags(le_u32(buf, 24)),
+            allocation_bitmap: le_u32(buf, 28),
+        }
     }
 }
 
@@ -95,7 +101,10 @@ impl StoreBlockRange {
     /// Parse a 24-byte store block range record.
     #[must_use]
     pub fn parse(buf: &[u8]) -> Self {
-        let _ = buf;
-        unimplemented!("RED: StoreBlockRange::parse")
+        StoreBlockRange {
+            store_offset: le_u64(buf, 0),
+            relative_offset: le_u64(buf, 8),
+            range_size: le_u64(buf, 16),
+        }
     }
 }
