@@ -11,7 +11,7 @@
 //!   store[0] id       = 1afc8871-8c76-11ed-8c4d-f894c2dfe804
 //!            created  = 2023-01-04 21:38:00.8254268 UTC (raw FILETIME 133173418808254268;
 //!                       pyvshadow prints the microsecond-truncated .825426)
-//!            vol_size = 255136931328
+//!            `vol_size` = 255136931328
 //!
 //! Run:
 //! ```text
