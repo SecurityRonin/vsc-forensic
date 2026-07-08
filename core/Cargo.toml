@@ -16,6 +16,7 @@ name = "vsc"
 
 [dependencies]
 thiserror = { workspace = true }
+uuid = { workspace = true }
 
 [lints]
 workspace = true
