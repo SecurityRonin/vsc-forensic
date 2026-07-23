@@ -10,7 +10,7 @@
 [![CI](https://github.com/SecurityRonin/vsc-forensic/actions/workflows/ci.yml/badge.svg)](https://github.com/SecurityRonin/vsc-forensic/actions/workflows/ci.yml)
 [![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 
-**Windows Volume Shadow Copy (VSS) forensics for Rust — a panic-free reader for the shadow-copy store/catalog structures, and a graded anomaly analyzer that turns each NTFS snapshot into evidence you can diff across time.**
+**Windows Volume Shadow Copy (VSS) forensics for Rust — a fuzzed, panic-free-by-lint reader for the shadow-copy store/catalog structures, and a graded anomaly analyzer that turns each NTFS snapshot into evidence you can diff across time.**
 
 VSS is how Windows keeps point-in-time snapshots of an NTFS volume under `System Volume Information`: each shadow copy preserves the blocks that were about to change, so the live volume plus the VSS stores together encode the temporal cohort of the filesystem's past states. `vsc-forensic` is the `[P^H]` disk-history member of the forensic fleet — it navigates that VSS region by snapshot, enumerates the catalog of stores and their metadata, and surfaces shadow-copy timeline and integrity anomalies as fleet findings.
 
