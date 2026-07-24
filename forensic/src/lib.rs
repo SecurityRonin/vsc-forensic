@@ -1,6 +1,6 @@
 //! # vsc-forensic — Volume Shadow Copy anomaly auditor
 //!
-//! Walks the shadow-copy stores decoded by [`vsc`](vsc) and emits severity-graded
+//! Walks the shadow-copy stores decoded by [`vsc`] and emits severity-graded
 //! [`forensicnomicon::report::Finding`]s. Findings are OBSERVATIONS, never
 //! verdicts: an absence of shadow copies is reported as *consistent with* MITRE
 //! T1490 deletion **or** a volume that simply never had snapshots — the analyzer
