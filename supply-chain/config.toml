@@ -17,10 +17,10 @@ url = "https://raw.githubusercontent.com/google/rust-crate-audits/main/audits.to
 url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 
 [policy.vsc-core]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.vsc-forensic]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [[exemptions.cfg-if]]
 version = "1.0.4"
@@ -217,14 +217,6 @@ criteria = "safe-to-deploy"
 [[exemptions.version_check]]
 version = "0.9.5"
 criteria = "safe-to-run"
-
-[[exemptions.vsc-core]]
-version = "0.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.vsc-forensic]]
-version = "0.2.0"
-criteria = "safe-to-deploy"
 
 [[exemptions.wasm-bindgen]]
 version = "0.2.126"
