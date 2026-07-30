@@ -25,7 +25,7 @@
 //! out-of-range overlay contributes nothing (its sub-blocks are skipped).
 
 use std::collections::{BTreeMap, HashSet};
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{self, Read, Seek, SeekFrom};
 
 use crate::block::BlockDescriptor;
 use crate::catalog::BLOCK_SIZE;
@@ -57,9 +57,27 @@ const MAX_STORE_BLOCKS: usize = 1 << 20;
 ///
 /// Built by [`VssVolume::snapshot`]; borrows the volume's reader mutably so
 /// reconstruction can pull live and store blocks lazily (the volumes are far too
-/// large to hold in memory).
+/// large to hold in memory). For an owned, `Send + Sync` handle that outlives the
+/// volume, enable the `vfs` feature and use `crate::vfs::VssSnapshotSource`.
 pub struct Snapshot<'v, R> {
     reader: &'v mut R,
+    state: SnapshotState,
+}
+
+/// The reader-independent half of a reconstructed snapshot: everything the
+/// copy-on-write overlay algorithm needs, holding no borrow of the volume.
+///
+/// Split out from [`Snapshot`] so a caller that must own its reader — the
+/// `forensic_vfs::ImageSource` adapter in [`crate::vfs`], whose positioned reads
+/// take `&self` on a `Send + Sync + 'static` handle — can pair one immutable
+/// state with its own reader instead of a `'v` borrow of a `VssVolume`. Reads
+/// take the reader as a parameter, so the state stays shareable while only the
+/// cursor needs exclusive access.
+///
+/// Every read here is I/O-only by construction: a corrupt descriptor
+/// reconstructs as zeros rather than erroring, so the error type is
+/// [`std::io::Error`], not [`VssError`].
+pub(crate) struct SnapshotState {
     volume_size: u64,
     /// Diff-area block descriptors keyed by their original (volume) offset.
     block_map: BTreeMap<u64, Vec<BlockDescriptor>>,
@@ -80,6 +98,17 @@ impl<R: Read + Seek> VssVolume<R> {
     ///   pointer (so neither the store-header nor the bitmap offset is known).
     /// - [`VssError::Io`] on an underlying read/seek failure.
     pub fn snapshot(&mut self, index: usize) -> Result<Snapshot<'_, R>, VssError> {
+        let state = self.snapshot_state(index)?;
+        Ok(Snapshot {
+            reader: &mut self.reader,
+            state,
+        })
+    }
+
+    /// Build the reader-independent [`SnapshotState`] of store `index`, walking
+    /// the diff-area and bitmap chains. The reader is released on return, so the
+    /// caller is free to pair the state with a reader it owns.
+    pub(crate) fn snapshot_state(&mut self, index: usize) -> Result<SnapshotState, VssError> {
         let (store_header_offset, store_bitmap_offset) = {
             let count = self.stores.len();
             let d = self
@@ -103,8 +132,7 @@ impl<R: Read + Seek> VssVolume<R> {
         let block_map = build_block_map(&mut self.reader, diff_start, self.volume_size)?;
         let bitmap = build_bitmap(&mut self.reader, store_bitmap_offset, self.volume_size)?;
 
-        Ok(Snapshot {
-            reader: &mut self.reader,
+        Ok(SnapshotState {
             volume_size: self.volume_size,
             block_map,
             bitmap,
@@ -113,6 +141,30 @@ impl<R: Read + Seek> VssVolume<R> {
 }
 
 impl<R: Read + Seek> Snapshot<'_, R> {
+    /// Reconstruct the single aligned 16384-byte block containing `offset`.
+    ///
+    /// `offset` need not be block-aligned; the block it falls in is reconstructed
+    /// in full. A block at or past the end of the volume reconstructs as zeros.
+    ///
+    /// # Errors
+    /// [`VssError::Io`] on an underlying read/seek failure.
+    pub fn read_block(&mut self, offset: u64) -> Result<[u8; BLOCK_SIZE], VssError> {
+        Ok(self.state.read_block(self.reader, offset)?)
+    }
+
+    /// Reconstruct an arbitrary-length, arbitrary-offset read, materializing each
+    /// spanned block and copying the requested slice out.
+    ///
+    /// Bytes at or past the end of the volume read as zeros.
+    ///
+    /// # Errors
+    /// [`VssError::Io`] on an underlying read/seek failure.
+    pub fn read_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<(), VssError> {
+        Ok(self.state.read_at(self.reader, offset, buf)?)
+    }
+}
+
+impl SnapshotState {
     /// Whether volume block `block_number` was unallocated in the snapshot (its
     /// store-bitmap bit is set). Out-of-range block numbers read as allocated.
     #[must_use]
@@ -125,14 +177,19 @@ impl<R: Read + Seek> Snapshot<'_, R> {
             .is_some_and(|b| b & (1u8 << bit) != 0)
     }
 
-    /// Reconstruct the single aligned 16384-byte block containing `offset`.
+    /// Reconstruct the single aligned 16384-byte block containing `offset`,
+    /// pulling live and store blocks through `reader`.
     ///
     /// `offset` need not be block-aligned; the block it falls in is reconstructed
     /// in full. A block at or past the end of the volume reconstructs as zeros.
     ///
     /// # Errors
-    /// [`VssError::Io`] on an underlying read/seek failure.
-    pub fn read_block(&mut self, offset: u64) -> Result<[u8; BLOCK_SIZE], VssError> {
+    /// The underlying read/seek failure.
+    pub(crate) fn read_block<R: Read + Seek>(
+        &self,
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<[u8; BLOCK_SIZE], io::Error> {
         let block_number = offset / BLOCK_SIZE as u64;
         let base = block_number.saturating_mul(BLOCK_SIZE as u64);
         let mut out = [0u8; BLOCK_SIZE];
@@ -146,7 +203,7 @@ impl<R: Read + Seek> Snapshot<'_, R> {
                     !d.flags.is_forwarder() && !d.flags.is_overlay() && !d.flags.is_not_used()
                 });
                 let base_source = last_plain.map_or(base, |d| d.store_offset);
-                read_block_at(self.reader, base_source, self.volume_size, &mut out)?;
+                read_block_at(reader, base_source, self.volume_size, &mut out)?;
 
                 // Overlay descriptors patch in their allocated 512-byte sub-blocks.
                 for d in descriptors
@@ -154,7 +211,7 @@ impl<R: Read + Seek> Snapshot<'_, R> {
                     .filter(|d| d.flags.is_overlay() && !d.flags.is_not_used())
                 {
                     let mut overlay = [0u8; BLOCK_SIZE];
-                    if read_block_at(self.reader, d.store_offset, self.volume_size, &mut overlay)? {
+                    if read_block_at(reader, d.store_offset, self.volume_size, &mut overlay)? {
                         apply_overlay(&mut out, &overlay, d.allocation_bitmap);
                     }
                 }
@@ -164,7 +221,7 @@ impl<R: Read + Seek> Snapshot<'_, R> {
                 if self.is_unallocated(block_number) {
                     Ok(out) // already zeroed
                 } else {
-                    read_block_at(self.reader, base, self.volume_size, &mut out)?;
+                    read_block_at(reader, base, self.volume_size, &mut out)?;
                     Ok(out)
                 }
             }
@@ -177,14 +234,19 @@ impl<R: Read + Seek> Snapshot<'_, R> {
     /// Bytes at or past the end of the volume read as zeros.
     ///
     /// # Errors
-    /// [`VssError::Io`] on an underlying read/seek failure.
-    pub fn read_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<(), VssError> {
+    /// The underlying read/seek failure.
+    pub(crate) fn read_at<R: Read + Seek>(
+        &self,
+        reader: &mut R,
+        offset: u64,
+        buf: &mut [u8],
+    ) -> Result<(), io::Error> {
         let mut written = 0usize;
         let mut cursor = offset;
         while written < buf.len() {
             let base = (cursor / BLOCK_SIZE as u64).saturating_mul(BLOCK_SIZE as u64);
             let within = (cursor - base) as usize;
-            let block = self.read_block(base)?;
+            let block = self.read_block(reader, base)?;
             let n = (BLOCK_SIZE - within).min(buf.len() - written);
             buf[written..written + n].copy_from_slice(&block[within..within + n]);
             written += n;
@@ -216,7 +278,7 @@ fn read_block_at<R: Read + Seek>(
     offset: u64,
     volume_size: u64,
     out: &mut [u8; BLOCK_SIZE],
-) -> Result<bool, VssError> {
+) -> Result<bool, io::Error> {
     match offset.checked_add(BLOCK_SIZE as u64) {
         Some(end) if end <= volume_size => {
             reader.seek(SeekFrom::Start(offset))?;

@@ -31,6 +31,8 @@ pub mod error;
 pub mod guid;
 pub mod reconstruct;
 pub mod store;
+#[cfg(feature = "vfs")]
+pub mod vfs;
 
 #[cfg(test)]
 mod tests;

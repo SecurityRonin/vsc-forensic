@@ -88,6 +88,7 @@ Findings are observations, not verdicts — the "consistent with" framing is del
 | `vsc-forensic` anomaly auditor (`VSC-*` findings → `forensicnomicon::report`) | ✅ |
 | Fuzzed (`fuzz_catalog` / `fuzz_store` / `fuzz_reconstruct`) + Tier-1 validated against `libvshadow` | ✅ |
 | COW block-list reconstruction — materialize a snapshot's view of the volume, read any block back | ✅ |
+| `vfs` feature — publish a reconstructed shadow copy as a [`forensic-vfs`](https://crates.io/crates/forensic-vfs) `ImageSource`, the fleet's `[H]` state-history byte source (needs Rust 1.85) | ✅ |
 
 ## Trust but verify
 
