@@ -18,6 +18,19 @@ name = "vsc"
 [dependencies]
 thiserror = { workspace = true }
 uuid = { workspace = true }
+# forensic-vfs (KNOWLEDGE leaf) — the read-only `ImageSource` positioned-read
+# contract. Optional so a bare reader stays dependency-light; the `vfs` feature
+# turns on the `impl ImageSource for VssSnapshotSource` adapter that publishes a
+# reconstructed shadow copy as the `[H]` state-history byte source (mirrors
+# apfs-core's and ntfs-core's `vfs` feature).
+forensic-vfs = { version = "0.7", optional = true }
+
+[features]
+# Adapt a reconstructed VSS snapshot to the forensic-vfs `ImageSource` trait
+# (see `src/vfs.rs`). NOTE: forensic-vfs declares `rust-version = "1.85"`, so
+# this feature raises the effective MSRV above the crate's own 1.81; a
+# default-features build still compiles on 1.81.
+vfs = ["dep:forensic-vfs"]
 
 [dev-dependencies]
 # Tier-1 oracle: open a real E01 disk image to validate against pyvshadow

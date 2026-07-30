@@ -827,3 +827,173 @@ fn reconstruct_read_at_empty_buffer_is_ok() {
     let mut buf = [0u8; 0];
     snap.read_at(0, &mut buf).unwrap();
 }
+
+// ===========================================================================
+// `vfs` feature — the [H] state-history bridge to `forensic_vfs::ImageSource`.
+//
+// `Snapshot<'v, R>` borrows the volume and reads through `&mut self`, while
+// `ImageSource` demands `Send + Sync` positioned reads through `&self`. These
+// tests pin the bridge: an OWNED source built over the same Tier-3 synthetic
+// image, read at an offset through the trait, usable as `Arc<dyn ImageSource>`.
+// ===========================================================================
+
+#[cfg(feature = "vfs")]
+mod vfs_source {
+    use std::io::{Read, Seek, SeekFrom};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    use forensic_vfs::{ImageSource, VfsError};
+
+    use super::{build_image, build_reconstruct_image, Cursor, RBS, R_BLK10, R_BLK11, R_BLK3};
+    use crate::vfs::VssSnapshotSource;
+    use crate::VssError;
+
+    const R_IMG_LEN: u64 = super::R_IMG_LEN as u64;
+
+    /// A reader that starts healthy and can be switched to fail every read, so
+    /// the I/O error path of a read AFTER construction is exercised.
+    struct FailSwitchReader {
+        inner: Cursor<Vec<u8>>,
+        fail: Arc<AtomicBool>,
+    }
+
+    impl Read for FailSwitchReader {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.fail.load(Ordering::SeqCst) {
+                return Err(std::io::Error::other("synthetic VSS read failure"));
+            }
+            self.inner.read(buf)
+        }
+    }
+
+    impl Seek for FailSwitchReader {
+        fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+            self.inner.seek(pos)
+        }
+    }
+
+    fn source() -> VssSnapshotSource<Cursor<Vec<u8>>> {
+        VssSnapshotSource::open(Cursor::new(build_reconstruct_image()), 0).unwrap()
+    }
+
+    #[test]
+    fn image_source_reads_plain_cow_bytes_at_offset() {
+        let src = source();
+        let mut buf = [0u8; 512];
+        assert_eq!(src.read_at(R_BLK10, &mut buf).unwrap(), 512);
+        // Block 10's live bytes are zero; the snapshot's copy-on-write base is
+        // store block 7 (0x77), so reading through the trait must yield 0x77.
+        assert_eq!(buf, [0x77u8; 512]);
+    }
+
+    #[test]
+    fn image_source_serves_the_snapshot_view_not_the_live_volume() {
+        let src = source();
+        // Block 3 is 0x33 live but bitmap-unallocated in the snapshot -> zeros.
+        let mut buf = [0xEEu8; 512];
+        assert_eq!(src.read_at(R_BLK3, &mut buf).unwrap(), 512);
+        assert_eq!(buf, [0x00u8; 512]);
+
+        // Block 11: base store8 (0x88) with sub-blocks 0 and 2 overlaid from
+        // store9 (0x99) — the overlay path, straddling a sub-block boundary.
+        let mut over = [0u8; 1536];
+        assert_eq!(src.read_at(R_BLK11, &mut over).unwrap(), 1536);
+        let mut expected = [0x88u8; 1536];
+        expected[0..512].fill(0x99);
+        expected[1024..1536].fill(0x99);
+        assert_eq!(over, expected);
+    }
+
+    #[test]
+    fn image_source_len_is_the_volume_size() {
+        let src = source();
+        assert_eq!(src.len(), R_IMG_LEN);
+        assert!(!src.is_empty());
+    }
+
+    #[test]
+    fn image_source_read_at_or_past_end_reads_zero_bytes() {
+        let src = source();
+        let mut buf = [0xEEu8; 32];
+        assert_eq!(src.read_at(R_IMG_LEN, &mut buf).unwrap(), 0);
+        assert_eq!(src.read_at(u64::MAX, &mut buf).unwrap(), 0);
+        assert_eq!(buf, [0xEEu8; 32], "a zero-length read leaves buf untouched");
+    }
+
+    #[test]
+    fn image_source_short_read_at_the_tail_returns_the_available_prefix() {
+        let src = source();
+        let mut buf = [0xEEu8; RBS];
+        // 100 bytes remain before the end of the volume.
+        assert_eq!(src.read_at(R_IMG_LEN - 100, &mut buf).unwrap(), 100);
+        assert_eq!(buf[100..], [0xEEu8; RBS - 100][..], "tail left untouched");
+    }
+
+    #[test]
+    fn image_source_empty_buffer_reads_zero_bytes() {
+        let src = source();
+        let mut buf = [0u8; 0];
+        assert_eq!(src.read_at(0, &mut buf).unwrap(), 0);
+    }
+
+    #[test]
+    fn open_propagates_store_index_out_of_range() {
+        match VssSnapshotSource::open(Cursor::new(build_reconstruct_image()), 5) {
+            Err(VssError::StoreIndexOutOfRange { index, count }) => {
+                assert_eq!(index, 5);
+                assert_eq!(count, 1);
+            }
+            Err(e) => panic!("expected StoreIndexOutOfRange, got {e:?}"),
+            Ok(_) => panic!("expected StoreIndexOutOfRange, got Ok"),
+        }
+    }
+
+    #[test]
+    fn open_propagates_missing_store_pointer() {
+        match VssSnapshotSource::open(Cursor::new(build_image(false)), 0) {
+            Err(VssError::StoreInfoUnavailable { index }) => assert_eq!(index, 0),
+            Err(e) => panic!("expected StoreInfoUnavailable, got {e:?}"),
+            Ok(_) => panic!("expected StoreInfoUnavailable, got Ok"),
+        }
+    }
+
+    #[test]
+    fn read_io_failure_surfaces_as_vfs_io_not_silent_zeros() {
+        let fail = Arc::new(AtomicBool::new(false));
+        let reader = FailSwitchReader {
+            inner: Cursor::new(build_reconstruct_image()),
+            fail: Arc::clone(&fail),
+        };
+        let src = VssSnapshotSource::open(reader, 0).unwrap();
+        fail.store(true, Ordering::SeqCst);
+        let mut buf = [0u8; 512];
+        match src.read_at(R_BLK10, &mut buf) {
+            Err(VfsError::Io { op, source }) => {
+                assert_eq!(op, "vss snapshot read");
+                assert_eq!(source.to_string(), "synthetic VSS read failure");
+            }
+            other => panic!("expected VfsError::Io, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn source_is_a_dyn_image_source_shareable_across_threads() {
+        // The whole point of the adapter: an owned, 'static + Send + Sync handle
+        // that composes as `Arc<dyn ImageSource>` at a forensic-vfs seam.
+        let shared: Arc<dyn ImageSource> = Arc::new(source());
+        let handles: Vec<_> = (0..4)
+            .map(|_| {
+                let s = Arc::clone(&shared);
+                std::thread::spawn(move || {
+                    let mut buf = [0u8; 512];
+                    assert_eq!(s.read_at(R_BLK10, &mut buf).unwrap(), 512);
+                    assert_eq!(buf, [0x77u8; 512]);
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
+}
