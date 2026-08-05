@@ -198,10 +198,6 @@ criteria = "safe-to-run"
 version = "0.4.12"
 criteria = "safe-to-deploy"
 
-[[exemptions.state-history-forensic]]
-version = "0.1.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.syn]]
 version = "2.0.117"
 criteria = "safe-to-deploy"
